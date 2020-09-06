@@ -136,7 +136,7 @@ const creatTextNode = text => ({
 
    可以看见页面#root节点下增加了一个div：
 
-   ![vnode-->node](imgForMd/06 vnode-node.png)
+   ![vnode-->node](imgForMd/06.vnode-node.png)
 
    
 
