@@ -1,10 +1,9 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import App from './App';
+import React from './yreact/';
+import ReactDOM from './yreact/ReactDOM';
 
-ReactDOM.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-  document.getElementById('root')
-);
+const jsx = <div className="border">
+  <p className="p">text</p>
+  <a href="#">hehe</a>
+</div>
+
+ReactDOM.render(jsx, document.getElementById('root'));

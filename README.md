@@ -1,68 +1,192 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+本项目旨在理清React源码, 及几个核心 API 的思想
 
-## Available Scripts
+1. 项目拉起
 
-In the project directory, you can run:
+```bash
+npx create-react-app tiny-react
+cd tiny-react
+npm start
+```
 
-### `yarn start`
+2. 将目录简化如下:
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+![简化目录](imgForMd/01.png)
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+3. 简单的React 和 ReactDOM的实现：
 
-### `yarn test`
+   1. React.createElement()为jsx实现的核心接口，具体见下图：
 
-Launches the test runner in the interactive watch mode.<br />
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+      ![React.createElement()](imgForMd/02.png)
 
-### `yarn build`
+   2. src\index.js 文件改写如下:
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
+      ```jsx
+      import React from './yreact/';
+      import ReactDOM from './yreact/ReactDOM';
+      
+      const jsx = <div className="border">app</div>
+      ReactDOM.render(jsx, document.getElementById('root'));
+      ```
 
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
+   3. 创建 `src\yreact\index.js` 作为React主文件
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+      ```jsx
+      //! node -- dom节点
+      //! vnode -- 虚拟dom节点
+      
+      // 接收type,props,children, 返回一个vnode
+      const createElement = (type, props) => {
+        // 把__source和__self属性删去，方便阅读
+        delete props.__source
+        delete props.__self
+        
+        return { type, props }
+      }
+      export default { createElement }
+      ```
 
-### `yarn eject`
+   4. 创建 `src\yreact\ReactDOM.js` 作为`ReactDOM.render()` 接口使用：
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+       ```jsx
+      const render = (vnode, container) => console.log('vnode', vnode)
+      export default { render }
+      ```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+      可以看到控制台：
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+      ![ReactDOM.render()](imgForMd/03.png)
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+   5. 这里还没处理children，可以继续对 createElement 进行改写, 加上`...children` , 把原来的jsx也改一下：
 
-## Learn More
+      ```jsx
+      - const createElement = (type, props) => {
+      + const createElement = (type, props, ...children) => {
+        ......
+      
+- return { type, props }
+      + return { type, props: { ...props, children } }
+      ```
+      
+      ```jsx
+      - const jsx = <div className="border">app</div>
+          
+      + const jsx = <div className="border">
+      +   <p>text</p>
++   <a href="#">hehe</a>
+      + </div>
+```
+      
+      控制台显示：
+      
+      ![加上...children](imgForMd/04.png)
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+以上的`["text"]` 和 `["hehe"]`并不能算完整，文本节点也须转换为对象才可，继续改造`createElement ` 方法：
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```js
+props: {
+    ...props,
+    // 把children放到新的props上：
+    // 假如为文本节点，则将其创建为一个对象，利用creatTextNode()函数：
+    children: children.map( child => typeof child==='object'? child : creatTextNode(child) )
+}
+```
 
-### Code Splitting
+在yreact/index.js文件里创建新的函数`creatTextNode` :
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
+```js
+const creatTextNode = text => ({
+  type: 'TEXT',
+  props: {
+    children: [],
+    nodeValue: text
+  }
+})
+```
 
-### Analyzing the Bundle Size
+控制台则显示：
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
+![处理文件节点后的vnode](imgForMd/05.png)
 
-### Making a Progressive Web App
+6. 完善yreact/ReactDOM.js, 把虚拟node变回真实node的过程：
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
+   ```js
+   const render = (vnode, container) => {
+     console.log('vnode', vnode)
+     // vnode -> node
+     const node = createNode(vnode)
+     // 把node放入container
+     container.appendChild(node)
+   }
+   
+   // 根据vnode, 创建一个node
+   const createNode = vnode => {
+     const {type, props} = vnode
+     let node;
+     if (type === 'TEXT') {
+       node = document.createTextNode('')
+     }else{
+       node = document.createElement(type)
+     }
+     return node
+   }
+   export default {
+     render
+   }
+   ```
 
-### Advanced Configuration
+   可以看见页面#root节点下增加了一个div：
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
+   ![vnode-->node](imgForMd/06 vnode变为node.png)
 
-### Deployment
+   
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
+这里只实现了一层的结构，必须在 `createNode`  里增加一个递归函数处理children `reconcilerChildren` 实现:
 
-### `yarn build` fails to minify
+```js
+const createNode = vnode => {
+  ... ...
+  // 递归循环children的元素：
+  + reconcilerChildren(vnode)    
+}
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
++ const reconcilerChildren = (children, node) => {
++  for (let i = 0; i < children.length; i ++ ) {
++    render( children[i], node )
++  }
++ }
+
+  return node
+}
+```
+
+页面`#root div` 下就添加进p和a标签了：
+
+![xxxx](imgForMd/08.png) 
+
+控制台递归打印出DOM结构：
+
+![cccc](imgForMd/07.png)
+
+处理完以上，再处理节点上的属性，如className, herf等等
+
+```js
+// 更新节点上的属性， 如className,  nodeValue等
+const updateNode = (node, nextVal) => {
+  Object.keys(nextVal)
+  .filter( k => k !== 'children' )
+  .forEach( k => node[k] = nextVal[k] )
+}
+```
+
+```js
+const createNode = vnode => {
+  ... ...
+  + reconcilerChildren(props.children, node)
+  ... ...
+}
+```
+
+页面：
+
+![09](imgForMd/09.png)
+
